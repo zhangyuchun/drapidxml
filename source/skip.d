@@ -1,6 +1,6 @@
 module skip;
 
-ubyte lookup_whitespace[256] = [
+ubyte[256] lookup_whitespace = [
 // 0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
     0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  1,  0,  0,  1,  0,  0,  // 0
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  // 1
@@ -20,7 +20,7 @@ ubyte lookup_whitespace[256] = [
     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0   // F
 ];              // Whitespace table
 
-ubyte lookup_node_name[256] = [
+ubyte[256] lookup_node_name = [
 // 0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
     0,  1,  1,  1,  1,  1,  1,  1,  1,  0,  0,  1,  1,  0,  1,  1,  // 0
     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  // 1
@@ -40,7 +40,7 @@ ubyte lookup_node_name[256] = [
     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1   // F
 ];           // Node name table
 
-ubyte lookup_element_name[256] = [
+ubyte[256] lookup_element_name = [
 // 0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
     0,  1,  1,  1,  1,  1,  1,  1,  1,  0,  0,  1,  1,  0,  1,  1,  // 0
     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  // 1
@@ -60,7 +60,7 @@ ubyte lookup_element_name[256] = [
     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1   // F
 ];          // Element name table
 
-ubyte lookup_text[256] =  [
+ubyte[256] lookup_text =  [
 // 0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
     0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  // 0
     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  // 1
@@ -80,7 +80,7 @@ ubyte lookup_text[256] =  [
     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1   // F
 ];
                     // Text table
-ubyte lookup_text_pure_no_ws[256] =  [
+ubyte[256] lookup_text_pure_no_ws =  [
 // 0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
     0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  // 0
     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  // 1
@@ -100,7 +100,7 @@ ubyte lookup_text_pure_no_ws[256] =  [
     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1   // F
 ];
          // Text table
-ubyte lookup_text_pure_with_ws[256] =  [
+ubyte[256] lookup_text_pure_with_ws =  [
 // 0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
     0,  1,  1,  1,  1,  1,  1,  1,  1,  0,  0,  1,  1,  0,  1,  1,  // 0
     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  // 1
@@ -120,7 +120,7 @@ ubyte lookup_text_pure_with_ws[256] =  [
     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1   // F
 ];
        // Text table
-ubyte lookup_attribute_name[256]  = [
+ubyte[256] lookup_attribute_name  = [
 // 0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
     0,  1,  1,  1,  1,  1,  1,  1,  1,  0,  0,  1,  1,  0,  1,  1,  // 0
     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  // 1
@@ -141,7 +141,7 @@ ubyte lookup_attribute_name[256]  = [
 ];
           
                     // Attribute name table
-ubyte lookup_attribute_data_1[256] = [
+ubyte[256] lookup_attribute_data_1 = [
 // 0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
     0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  // 0
     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  // 1
@@ -161,7 +161,7 @@ ubyte lookup_attribute_data_1[256] = [
     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1   // F
 ];        // Attribute data table with single quote
 
-ubyte lookup_attribute_data_1_pure[256] =  [
+ubyte[256] lookup_attribute_data_1_pure =  [
 // 0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
     0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  // 0
     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  // 1
@@ -181,7 +181,7 @@ ubyte lookup_attribute_data_1_pure[256] =  [
     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1   // F
 ];   // Attribute data table with single quote
 
-ubyte lookup_attribute_data_2[256] =  [
+ubyte[256] lookup_attribute_data_2 =  [
 // 0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
     0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  // 0
     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  // 1
@@ -201,7 +201,7 @@ ubyte lookup_attribute_data_2[256] =  [
     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1   // F
 ];        // Attribute data table with double quotes
 
-ubyte lookup_attribute_data_2_pure[256] = [
+ubyte[256] lookup_attribute_data_2_pure = [
 // 0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
     0,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  // 0
     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  // 1
@@ -221,7 +221,7 @@ ubyte lookup_attribute_data_2_pure[256] = [
     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1   // F
 ];   // Attribute data table with double quotes
 
-ubyte lookup_digits[256] =  {
+ubyte[256] lookup_digits =  [
 // 0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
 255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,  // 0
 255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,  // 1
@@ -239,9 +239,9 @@ ubyte lookup_digits[256] =  {
 255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,  // D
 255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,  // E
 255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255   // F
-]                  // Digits
+] ;                 // Digits
 
-ubyte lookup_upcase[256] =  [
+ubyte[256] lookup_upcase =  [
 // 0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  A   B   C   D   E   F
 0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15,   // 0
 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,   // 1
@@ -266,7 +266,7 @@ void skip(T)(ref string text)
 {
     int index = 0;
 
-    while(T::test(text[index]))
+    while(T.test(text[index]))
         index++;
     text = text[index .. $ - 1];
 }
@@ -327,9 +327,9 @@ struct text_pure_no_ws_pred
 // Detect text character (PCDATA) that does not require processing
 struct text_pure_with_ws_pred
 {
-    static unsigned char test(Ch ch)
+    static  ubyte test(ubyte ch)
     {
-        return internal::lookup_tables<0>::lookup_text_pure_with_ws[static_cast<unsigned char>(ch)];
+        return lookup_text_pure_with_ws[ch];
     }
 };
 
