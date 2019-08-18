@@ -261,12 +261,166 @@ ubyte[256] lookup_upcase =  [
 240,241,242,243,244,245,246,247,248,249,250,251,252,253,254,255   // F
 ]; 
 
+import std.stdio;
+
+
+
+        string skip_and_expand_character_refs(T , TP , alias Flags)(ref string text)
+        {
+            // If entity translation, whitespace condense and whitespace trimming is disabled, use plain skip
+            if (Flags & parse_no_entity_translation &&
+                !(Flags & parse_normalize_whitespace) &&
+                !(Flags & parse_trim_whitespace))
+            {
+                skip(T)(text);
+                return text;
+            }
+
+            // Use simple skip until first modification is detected
+            skip<TP>(text);
+
+            // Use translation skip
+            Ch *src = text;
+            Ch *dest = src;
+            while (StopPred::test(*src))
+            {
+                // If entity translation is enabled
+                if (!(Flags & parse_no_entity_translation))
+                {
+                    // Test if replacement is needed
+                    if (src[0] == Ch('&'))
+                    {
+                        switch (src[1])
+                        {
+
+                        // &amp; &apos;
+                        case Ch('a'):
+                            if (src[2] == Ch('m') && src[3] == Ch('p') && src[4] == Ch(';'))
+                            {
+                                *dest = Ch('&');
+                                ++dest;
+                                src += 5;
+                                continue;
+                            }
+                            if (src[2] == Ch('p') && src[3] == Ch('o') && src[4] == Ch('s') && src[5] == Ch(';'))
+                            {
+                                *dest = Ch('\'');
+                                ++dest;
+                                src += 6;
+                                continue;
+                            }
+                            break;
+
+                        // &quot;
+                        case Ch('q'):
+                            if (src[2] == Ch('u') && src[3] == Ch('o') && src[4] == Ch('t') && src[5] == Ch(';'))
+                            {
+                                *dest = Ch('"');
+                                ++dest;
+                                src += 6;
+                                continue;
+                            }
+                            break;
+
+                        // &gt;
+                        case Ch('g'):
+                            if (src[2] == Ch('t') && src[3] == Ch(';'))
+                            {
+                                *dest = Ch('>');
+                                ++dest;
+                                src += 4;
+                                continue;
+                            }
+                            break;
+
+                        // &lt;
+                        case Ch('l'):
+                            if (src[2] == Ch('t') && src[3] == Ch(';'))
+                            {
+                                *dest = Ch('<');
+                                ++dest;
+                                src += 4;
+                                continue;
+                            }
+                            break;
+
+                        // &#...; - assumes ASCII
+                        case Ch('#'):
+                            if (src[2] == Ch('x'))
+                            {
+                                unsigned long code = 0;
+                                src += 3;   // Skip &#x
+                                while (1)
+                                {
+                                    unsigned char digit = internal::lookup_tables<0>::lookup_digits[static_cast<unsigned char>(*src)];
+                                    if (digit == 0xFF)
+                                        break;
+                                    code = code * 16 + digit;
+                                    ++src;
+                                }
+                                insert_coded_character<Flags>(dest, code);    // Put character in output
+                            }
+                            else
+                            {
+                                unsigned long code = 0;
+                                src += 2;   // Skip &#
+                                while (1)
+                                {
+                                    unsigned char digit = internal::lookup_tables<0>::lookup_digits[static_cast<unsigned char>(*src)];
+                                    if (digit == 0xFF)
+                                        break;
+                                    code = code * 10 + digit;
+                                    ++src;
+                                }
+                                insert_coded_character<Flags>(dest, code);    // Put character in output
+                            }
+                            if (*src == Ch(';'))
+                                ++src;
+                            else
+                                RAPIDXML_PARSE_ERROR("expected ;", src);
+                            continue;
+
+                        // Something else
+                        default:
+                            // Ignore, just copy '&' verbatim
+                            break;
+
+                        }
+                    }
+                }
+
+                // If whitespace condensing is enabled
+                if (Flags & parse_normalize_whitespace)
+                {
+                    // Test if condensing is needed
+                    if (whitespace_pred::test(*src))
+                    {
+                        *dest = Ch(' '); ++dest;    // Put single space in dest
+                        ++src;                      // Skip first whitespace char
+                        // Skip remaining whitespace chars
+                        while (whitespace_pred::test(*src))
+                            ++src;
+                        continue;
+                    }
+                }
+
+                // No replacement, only copy character
+                *dest++ = *src++;
+
+            }
+
+            // Return new end
+            text = src;
+            return dest;
+
+        }
+
 
 void skip(T)(ref string text)
 {
     int index = 0;
-
-    while(T.test(text[index]))
+    int length = text.length;
+    while(T.test(text[index]) && index < text.length)
         index++;
     text = text[index .. $ - 1];
 }

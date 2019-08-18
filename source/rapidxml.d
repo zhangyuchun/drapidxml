@@ -67,8 +67,6 @@ class xml_base
 
 class xml_attribute :  xml_base
 {
-
-
 	xml_attribute m_prev_attribute;
 	xml_attribute m_next_attribute;
 	string	m_xmlns;
@@ -400,18 +398,18 @@ class xml_document :  xml_node
 		this.m_parent = parent ? parent.m_first_node : null;
 
 		parse_bom(text);
-
+		
 		size_t index = 0;
 		size_t length = text.length;
 		while(1)
 		{
 			skip!(whitespace_pred)(text); 
-			if(index == length)
+			if(index >= text.length)
 				break;
 			if(text[index] =='<')
 			{
 				++index;
-				text = text[index .. $ - 1];
+				text = text[index .. $];
 				xml_node  node = parse_node!(Flags)(text);
 				if(node)
 				{
@@ -427,7 +425,7 @@ class xml_document :  xml_node
 				writeln("expected <", text);
 		}
 		if(!first_node())
-			writeln("no root element", text[index .. $ - 1]);
+			writeln("no root element", text[index .. $ ]);
 		return string.init;
 	}
 
@@ -439,14 +437,14 @@ class xml_document :  xml_node
 				return parse_element!Flags(text);
 			
 			case '?':
-				text = text[1 .. $ - 1];
+				text = text[1 .. $ ];
 				if(
 					((text[0] == 'x' ) || (text[0] == 'X')) &&
 				((text[0] == 'm' ) || (text[0] == 'M')) &&
 				((text[0] == 'l' ) || (text[0] == 'L')) &&
 				whitespace_pred.test(text[3]))
 				{
-					text = text[4 .. $- 1];
+					text = text[4 .. $];
 					return parse_xml_declaration!Flags(text);
 				}
 				else
@@ -460,7 +458,7 @@ class xml_document :  xml_node
 				case '-':
 					if(text[2] == '-')
 					{
-						text = text[3 .. $ - 1];
+						text = text[3 .. $ ];
 						return parse_comment!Flags(text);
 					} 
 					break;
@@ -469,7 +467,7 @@ class xml_document :  xml_node
                         text[5] == ('T') && text[6] == ('A') && text[7] == ('['))
                     {
                         // '<![CDATA[' - cdata
-                        text = text[8 .. $ - 1];     // Skip '![CDATA['
+                        text = text[8 .. $ ];     // Skip '![CDATA['
                         return parse_cdata!Flags(text);
                     }
                     break;
@@ -481,7 +479,7 @@ class xml_document :  xml_node
                         whitespace_pred.test(text[8]))
                     {
                         // '<!DOCTYPE ' - doctype
-                        text = text[9 .. $ - 1];      // skip '!DOCTYPE '
+                        text = text[9 .. $ ];      // skip '!DOCTYPE '
                         return parse_doctype!Flags(text);
                     }
 					break;
@@ -490,14 +488,14 @@ class xml_document :  xml_node
 
 				} 
 
-				 text = text[1 .. $ - 1];     // Skip !
+				 text = text[1 .. $ ];     // Skip !
                 while (text[0] != ('>'))
                 {
                     if (text == null)
                         writeln("unexpected end of data", text);
-                    text = text[1 .. $ - 1];
+                    text = text[1 .. $ ];
                 }
-                text = text[1 .. $ - 1];     // Skip '>'
+                text = text[1 .. $ ];     // Skip '>'
                 return null;   // No node recognized
 
 		}
@@ -514,9 +512,9 @@ class xml_document :  xml_node
                 {
                     if (!text[0])
                         writeln("unexpected end of data", text);
-                    text = text[1 .. $-1];
+                    text = text[1 .. $];
                 }
-                text = text[3 .. $ - 1];      // Skip ]]>
+                text = text[3 .. $];      // Skip ]]>
                 return null;       // Do not produce CDATA node
             }
 
@@ -526,7 +524,7 @@ class xml_document :  xml_node
             {
                 if (!text[0])
                     writeln("unexpected end of data", text);
-                text = text[1 .. $ - 1];
+                text = text[1 .. $ ];
             }
 
             // Create new cdata node
@@ -537,7 +535,7 @@ class xml_document :  xml_node
             // Place zero terminator after value
            
 
-            text = text[3 .. $ - 1];      // Skip ]]>
+            text = text[3 .. $ ];      // Skip ]]>
             return cdata;
         }
 
@@ -546,14 +544,14 @@ class xml_document :  xml_node
 		xml_node element = new xml_node();
 		string prefix = text;
 		//skip element_name_pred
-		skip!(element_name_pred)(text);
 
+		skip!(element_name_pred)(text);
 		if(text == prefix)
 			writeln("expected element name or prefix", text);
-		if(text[0] == ':')
+		if(text.length >0 && text[0] == ':')
 		{
 			element.m_prefix = prefix[0 .. prefix.length - text.length].dup;
-			text = text[1 .. $ -1];
+			text = text[1 .. $ ];
 			string name = text;
 			//skip node_name_pred
 			skip!(node_name_pred)(text);
@@ -569,9 +567,9 @@ class xml_document :  xml_node
 		skip!(whitespace_pred)(text);
 		parse_node_attributes!(Flags)(text , element);
 
-		if(text[0] == '>')
+		if(text.length > 0 && text[0] == '>')
 		{
-			text = text[1 .. $-1];
+			text = text[1 .. $];
 			string contents = text;
 			string contents_end = null;
 			if(!(Flags & parse_open_only))
@@ -582,13 +580,13 @@ class xml_document :  xml_node
 				element.m_contents = text[0 .. contents.length - contents_end.length].dup;
 			}
 		}
-		else if(text[0] == '/')
+		else if(text.length > 0 && text[0] == '/')
 		{
-			text = text[1 .. $ - 1];
+			text = text[1 .. $ ];
 			if(text[0] != '>')
 				writeln("expected >", text);
 			
-			text = text[1 .. $ - 1];
+			text = text[1 .. $ ];
 
 			if(Flags & parse_open_only)
 				writeln("open_only, but closed", text);
@@ -620,7 +618,7 @@ after_data_node:
 				if(text[1] == '/')
 				{
 					retval = text;
-					text = text[2 .. $ - 1];
+					text = text[2 .. $ ];
 					if(Flags & parse_validate_closing_tags)
 					{
 						string closing_name = text;
@@ -636,7 +634,7 @@ after_data_node:
 					skip!(whitespace_pred)(text);
 					if(text[0] != '>')
 						writeln("expected >", text);
-					text = text[1 .. $- 1];
+					text = text[1 .. $];
 					if(Flags & parse_open_only)
 						writeln("Unclosed element actually closed.", text);
 					
@@ -644,7 +642,7 @@ after_data_node:
 				}
 				else
 				{
-					text = text[1 .. $ - 1];
+					text = text[1 .. $ ];
 					if(xml_node child = parse_node!(Flags & ~parse_open_only)(text))
 						node.append_node(child);
 				}
@@ -659,10 +657,11 @@ after_data_node:
 	void parse_node_attributes(int Flags)(ref string text , xml_node node)
 	{
 		int index = 0;
-		while(attribute_name_pred.test(text[0]))
+		
+		while(text.length > 0 && attribute_name_pred.test(text[0]))
 		{
 			string name = text;
-			text = text[1 .. $ -1];
+			text = text[1 .. $ ];
 			skip!(attribute_name_pred)(text);
 			if(text == name)
 				writeln("expected attribute name", name);
@@ -672,33 +671,34 @@ after_data_node:
 			node.append_attribute(attribute);
 
 			skip!(whitespace_pred)(text);
-
+			
 			if(text[0] != '=')
 				writeln("expected =", text);
 			
-			text = text[1 .. $ - 1];
+			text = text[1 .. $ ];
 
 			skip!(whitespace_pred)(text);
-
+			
 			char quote = text[0];
 			if(quote != '\'' && quote != '\"')
 				writeln("expected ' or \"", text);
 			
-			text = text[1 .. $ - 1];
+			
+			text = text[1 .. $ ];
 			string value = text ;
 			string end;
 			const int AttFlags = Flags & ~parse_normalize_whitespace;
 			/*if(quote == "\'")
-				end = skip_and_expand_character_refs
+				end = skip_and_expand_character_refs  spring
 			else
 				end = skip_and_expand_character_refs*/
 			
 			attribute.m_value = value[0 .. value.length - end.length];
 
-			if(text[0] != quote)
+			if(text.length > 0 && text[0] != quote)
 				writeln("expected ' or \"", text);
 			
-			text = text[1 .. $ - 1];
+			text = text[1 .. $ ];
 
 			skip!(whitespace_pred)(text);
 
@@ -710,10 +710,11 @@ after_data_node:
 	
 	static void skip(T )(ref string text)
 	{
+		
 		string tmp = text;
-		while(T.test(tmp[0]))
+		while(tmp.length > 0 && T.test(tmp[0]))
 		{
-			tmp = tmp[1 .. $ - 1];
+			tmp = tmp[1 .. $];	
 		}
 		text = tmp;
 	}
@@ -724,7 +725,7 @@ after_data_node:
 		&& text[1] == 0xBB 
 		&& text[2] == 0xBF)
 		{
-			text = text[3 .. $ - 1];
+			text = text[3 .. $ ];
 		}
 	}
 
@@ -739,9 +740,9 @@ after_data_node:
                 {
                     if (!text[0]) 
 					writeln("unexpected end of data", text);
-                    text = text[1 .. $ - 1];
+                    text = text[1 .. $ ];
                 }
-                text = text[2 .. $ - 1];    // Skip '?>'
+                text = text[2 .. $ ];    // Skip '?>'
                 return null;
             }
 
@@ -761,7 +762,7 @@ after_data_node:
 				// Skip ?>
 				if (text[0] != '?' || text[1] != '>') 
 					writeln("expected ?>", text);
-				text = text[2 .. $ - 1];
+				text = text[2 .. $ ];
 
 				return declaration;
 			}
@@ -795,7 +796,7 @@ after_data_node:
                 {
                     if (text == null)
                         writeln("unexpected end of data", text);
-                    text = text[1 .. $ - 1];
+                    text = text[1 .. $ ];
                 }
 
                 // Set pi value (verbatim, no entity expansion or whitespace normalization)
@@ -804,7 +805,7 @@ after_data_node:
                 // Place zero terminator after name and value
 				// no need
 
-                text = text[2 .. $ - 1];                          // Skip '?>'
+                text = text[2 .. $ ];                          // Skip '?>'
                 return pi;
             }
             else
@@ -814,9 +815,9 @@ after_data_node:
                 {
                     if (text[0] == '\0')
                         writeln("unexpected end of data", text);
-                    text = text[1 .. $ - 1];
+                    text = text[1 .. $ ];
                 }
-                text = text[2 .. $ - 1];    // Skip '?>'
+                text = text[2 .. $ ];    // Skip '?>'
                 return null;
             }
         }
@@ -831,9 +832,9 @@ after_data_node:
                 while (text[0] != '-' || text[1] != '-' || text[2] != '>')
                 {
                     if (!text[0]) writeln("unexpected end of data", text);
-                    text = text[1 .. $-1];
+                    text = text[1 .. $];
                 }
-                text = text [3 .. $- 1];     // Skip '-->'
+                text = text [3 .. $];     // Skip '-->'
                 return null;      // Do not produce comment node
             }
 
@@ -847,7 +848,7 @@ after_data_node:
 				while (text[0] != '-' || text[1] != '-' || text[2] != '>')
 				{
 					if (!text[0]) writeln("unexpected end of data", text);
-					text= text[1 .. $- 1];
+					text= text[1 .. $];
 				}
 
 				// Create comment node
@@ -858,7 +859,7 @@ after_data_node:
 				// Place zero terminator after comment value
 				// no need
 
-				text = text[3 .. $ - 1];     // Skip '-->'
+				text = text[3 .. $ ];     // Skip '-->'
 				return comment;
 			}
         }
@@ -881,7 +882,7 @@ after_data_node:
                 // This works for all W3C test files except for 2 most wicked
                 case ('['):
                 {
-                    text = text[1 .. $ - 1];     // Skip '['
+                    text = text[1 .. $ ];     // Skip '['
                     int depth = 1;
                     while (depth > 0)
                     {
@@ -891,7 +892,7 @@ after_data_node:
                             case ']': --depth; break;
                             default : writeln("unexpected end of data", text);
                         }
-                        text = text[1 .. $-1];
+                        text = text[1 .. $];
                     }
                     break;
                 }
@@ -903,7 +904,7 @@ after_data_node:
                 // Other character, skip it
 				break;
                 default:
-                    text = text[1 .. $ - 1];
+                    text = text[1 .. $ ];
 
                 }
             }
@@ -919,12 +920,12 @@ after_data_node:
                 // Place zero terminator after value
                 // no need
 
-                text = text[1 .. $ - 1];      // skip '>'
+                text = text[1 .. $ ];      // skip '>'
                 return doctype;
             }
             else
             {
-                text = text[1 .. $ - 1];      // skip '>'
+                text = text[1 .. $ ];      // skip '>'
                 return null;
             }
 
@@ -935,15 +936,3 @@ after_data_node:
 
 
 
-int main()
-{
-	writeln("0");
-	xml_document doc;
-	string doc_text = "<single-element/>";
-	writeln("1");
-	doc.parse!(0)(doc_text);
-	writeln("2");
-	auto node = doc.first_node();
-	writeln(node.m_name);
-	return 0;
-}
