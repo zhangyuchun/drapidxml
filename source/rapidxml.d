@@ -2,7 +2,7 @@ module rapidxml;
 
 import skip;
 import std.stdio;
-
+import std.exception;
 enum node_type
 {
 	node_document,      //!< A document node. Name and value are empty.
@@ -16,52 +16,14 @@ enum node_type
 	node_literal        //!< Value is unencoded text (used for inserting pre-rendered XML).
 };
 
- // Parsing flags
- const int parse_no_data_nodes = 0x1;
 
-const int parse_no_element_values = 0x2;
 
-const int parse_no_string_terminators = 0x4;
-
-const int parse_no_entity_translation = 0x8;
-
-const int parse_no_utf8 = 0x10;
-
-const int parse_declaration_node = 0x20;
-
-const int parse_comment_nodes = 0x40;
-
-const int parse_doctype_node = 0x80;
-
-const int parse_pi_nodes = 0x100;
-
-const int parse_validate_closing_tags = 0x200;
-
-const int parse_trim_whitespace = 0x400;
-
-const int parse_normalize_whitespace = 0x800;
-
-const int parse_open_only = 0x1000;
-
-const int parse_parse_one = 0x2000;
-
-const int parse_validate_xmlns = 0x4000;
-
-const int parse_default = 0;
-
-const int parse_non_destructive = parse_no_string_terminators | parse_no_entity_translation;
-
-const int parse_fastest = parse_non_destructive | parse_no_data_nodes;
-
-const int parse_full = parse_declaration_node | parse_comment_nodes | parse_doctype_node | parse_pi_nodes | parse_validate_closing_tags;
-
- 
 
 class xml_base
 {
 	string m_name;
 	string m_value;
-	xml_base m_parent;
+	xml_node m_parent;
 
 }
 
@@ -71,6 +33,42 @@ class xml_attribute :  xml_base
 	xml_attribute m_next_attribute;
 	string	m_xmlns;
 	string  m_local_name;
+
+	   xml_document document() 
+        {
+            if (xml_node node = m_parent)
+            {
+                while (node.m_parent)
+                    node = node.m_parent;
+                return node.m_type == node_type.node_document ? cast(xml_document)(node) : null;
+            }
+            else
+                return null;
+        }
+
+        string xmlns() 
+        {
+            if (m_xmlns) return m_xmlns;
+            char[] p;
+            char[] name = cast(char[])m_name.dup;
+            for (p = name; p.length > 0 && p[0] != ':'; p=p[1..$])
+            {	
+				if ((m_name.length - p.length) >= m_name.length) 
+					break;
+			}
+            if (p.length == 0 || ((m_name.length - p.length) >= m_name.length)) {
+				m_xmlns = "nullstring";
+                return m_xmlns;
+            }
+            xml_node  element = m_parent;
+            if (element) 
+			{
+				char []xmlns = cast(char[])m_xmlns;
+				element.xmlns_lookup(xmlns, name[0 .. m_name.length - p.length]);
+				m_xmlns = cast(string)xmlns.dup;
+			}
+            return m_xmlns;
+        }
 }
 
 class xml_node:  xml_base
@@ -87,12 +85,104 @@ class xml_node:  xml_base
 	xml_node m_next_sibling;
 	string m_contents;
 
+	string xmlns()
+	{
+		if(m_xmlns.length > 0)
+			return m_xmlns;
+		char[] xmlns;
+		xmlns_lookup(xmlns , cast(char[])m_prefix);
+		m_xmlns = cast(string)xmlns.dup;
+		return m_xmlns;
+	}
+
+    xml_document document() 
+    {
+            xml_node node = cast(xml_node)(this);
+            while (node.m_parent)
+                node = node.m_parent;
+            return node.m_type == node_type.node_document ? cast(xml_document)(node) : null;
+		
+    }
+
+	void xmlns_lookup(ref char []xmlns,  char[]  prefix) 
+        {
+            char[] freeme;
+            char[] attrname;
+			int prefix_size = cast(int)prefix.length;
+            if (prefix) {
+                // Check if the prefix begins "xml".
+                if (prefix_size >= 3
+                    && prefix[0] == ('x')
+                    && prefix[1] == ('m')
+                    && prefix[2] == ('l')) {
+                    if (prefix_size == 3) {
+                        xmlns = cast(char[]) "http://www.w3.org/XML/1998/namespace";
+                        return;
+                    } else if (prefix_size == 5
+                               && prefix[3] == ('n')
+                               && prefix[4] == ('s')) {
+                        xmlns = cast(char[]) "http://www.w3.org/2000/xmlns/";
+                        return;
+                    }
+                }
+				attrname.length = prefix_size + 6;
+                freeme = attrname;
+                char[] p1= cast(char[])"xmlns";
+                for(int i = 0 ;i < p1.length ; i++)
+					attrname[i] = p1[i];
+
+                char [] p = prefix;
+                attrname[p1.length] = ':';
+				int index = cast(int)p1.length + 1;
+                while (p.length > 0) {
+					attrname[index++] = p[0];
+					p = p[1 .. $];
+                    if ((freeme.length - attrname[index .. $].length ) >= (prefix_size + 6)) break;
+                }
+                attrname = freeme;
+            } else {
+				attrname.length = 5;
+                freeme = attrname ;
+                char[]  p1=cast(char[])"xmlns";
+                for(int i = 0 ;i < p1.length ; i++)
+					attrname[i] = p1[i];
+                attrname = freeme;
+            }
+            for ( xml_node node = this;
+                 node;
+                 node = node.m_parent) {
+                xml_attribute attr = node.first_attribute(cast(string)attrname);
+				if (attr !is null ) {
+                    xmlns = cast(char[])attr.m_value.dup;
+                  //  if (xmlns) {
+                  //      xmlns_size = attr->value_size();
+                  //  }
+                    break;
+                }
+            }
+            if (xmlns.length == 0) {
+                if (prefix.length == 0) {
+                    xmlns = cast(char[])"nullstring".dup;
+                   // xmlns_size = 0;
+                }
+            }
+           
+        }
+	
+
 	xml_node first_node(string name = null , string xmlns = null , bool case_sensitive = true)
 	{
+		if(xmlns.length == 0 && name.length > 0)
+		{
+			xmlns = this.xmlns();
+		}
+
 		for(xml_node child = m_first_node ; child ; child = child.m_next_sibling)
 		{
-			if((!name || child.m_name == name) && (!xmlns || child.m_xmlns == xmlns))
+			if((!name || child.m_name == name) && (!xmlns || child.xmlns() == xmlns))
+			{				
 				return child;
+			}
 		}
 		return null;
 	}
@@ -101,7 +191,7 @@ class xml_node:  xml_base
 	{
 		for(xml_node child = m_last_node ; child ; child = child.m_prev_sibling)
 		{
-			if((!name || child.m_name == name) && (!xmlns || child.m_xmlns == xmlns))
+			if((!name || child.m_name == name) && (!xmlns || child.xmlns() == xmlns))
 				return child;
 		}
 		return null;
@@ -218,8 +308,11 @@ class xml_node:  xml_base
 		{
 			for(xml_attribute attribute = m_first_attribute ; attribute ; attribute = attribute.m_next_attribute)
 			{
+			
 				if(attribute.m_name == name)
+				{	
 					return attribute;
+				}
 			}
 			return null;
 		}
@@ -350,38 +443,41 @@ class xml_node:  xml_base
 		m_first_attribute = null;
 	}
 
-	void validate()
+	bool validate()
 	{
-		if(m_xmlns == null)
+		if(this.xmlns() == null)
 		{	
 			writeln("Element XMLNS unbound");
-			return;
+			return false;
 		}
 		for(xml_node child = first_node(); child ; child = child.m_next_sibling)
-			child.validate();
-
+		{
+			if(!child.validate())
+				return false;
+		}
 		for(xml_attribute attribute = first_attribute() ; attribute ; attribute = attribute.m_next_attribute)
 		{
-			if(attribute.m_xmlns == null)
+			if(attribute.xmlns() == null)
 			{	
 				writeln("Attribute XMLNS unbound");
-				return;
+				return false;
 			}
 			for(xml_attribute otherattr = first_attribute() ; otherattr != attribute; otherattr = otherattr.m_next_attribute)
 			{	
 				if(attribute.m_name == otherattr.m_name)
 				{	
 					writeln("Attribute doubled");
-					return;
+					return false;
 				}
-				if(attribute.m_xmlns == otherattr.m_xmlns && attribute.m_local_name == otherattr.m_local_name)
+				if(attribute.xmlns() == otherattr.xmlns() && attribute.m_local_name == otherattr.m_local_name)
 				{
 					writeln("Attribute XMLNS doubled");
-					return;
+					return false;
 				}
 			}
 
 		}
+		return true;
 	}
 }
 
@@ -391,11 +487,12 @@ class xml_node:  xml_base
 
 class xml_document :  xml_node
 {
-	string parse(int Flags)(string text , xml_document parent = null)
+	string parse(int Flags)(string stext , xml_document parent = null)
 	{
 		this.remove_all_nodes();
 		this.remove_all_attributes();
 		this.m_parent = parent ? parent.m_first_node : null;
+		char[] text = cast(char[])stext.dup;
 
 		parse_bom(text);
 		
@@ -422,14 +519,14 @@ class xml_document :  xml_node
 				}
 			}
 			else
-				writeln("expected <", text);
+				throw new parse_error("expected <", text);
 		}
 		if(!first_node())
-			writeln("no root element", text[index .. $ ]);
+			throw new parse_error("no root element", text[index .. $ ]);
 		return string.init;
 	}
 
-	xml_node parse_node(int Flags)(ref string text)
+	xml_node parse_node(int Flags)(ref char[] text)
 	{
 		switch(text[0])
 		{
@@ -492,7 +589,7 @@ class xml_document :  xml_node
                 while (text[0] != ('>'))
                 {
                     if (text == null)
-                        writeln("unexpected end of data", text);
+                        throw new parse_error("unexpected end of data", text);
                     text = text[1 .. $ ];
                 }
                 text = text[1 .. $ ];     // Skip '>'
@@ -502,7 +599,7 @@ class xml_document :  xml_node
 	}
 
 	  
-        xml_node parse_cdata(int Flags)(ref string text)
+        xml_node parse_cdata(int Flags)(ref char[] text)
         {
             // If CDATA is disabled
             if (Flags & parse_no_data_nodes)
@@ -511,7 +608,7 @@ class xml_document :  xml_node
                 while (text[0] != ']' || text[1] != ']' || text[2] != '>')
                 {
                     if (!text[0])
-                        writeln("unexpected end of data", text);
+                        throw new parse_error("unexpected end of data", text);
                     text = text[1 .. $];
                 }
                 text = text[3 .. $];      // Skip ]]>
@@ -519,18 +616,18 @@ class xml_document :  xml_node
             }
 
             // Skip until end of cdata
-            string value = text;
+            char[] value = text;
             while (text[0] != (']') || text[1] != (']') || text[2] != ('>'))
             {
                 if (!text[0])
-                    writeln("unexpected end of data", text);
+                    throw new parse_error("unexpected end of data", text);
                 text = text[1 .. $ ];
             }
 
             // Create new cdata node
             xml_node cdata = new xml_node;
 			xml_node.m_type = node_type.node_cdata;
-            cdata.m_value = value[ 0 .. value.length - text.length];
+            cdata.m_value = cast(string)value[ 0 .. value.length - text.length].dup;
 
             // Place zero terminator after value
            
@@ -538,25 +635,81 @@ class xml_document :  xml_node
             text = text[3 .. $ ];      // Skip ]]>
             return cdata;
         }
+        
+		char parse_and_append_data(int Flags)(xml_node node, ref char []text, char[] contents_start)
+        {
+            // Backup to contents start if whitespace trimming is disabled
+            if (!(Flags & parse_trim_whitespace))
+                text = contents_start;
 
-	xml_node parse_element(int Flags)(ref string text)
+            // Skip until end of data
+            char [] value = text;
+			char []end;
+            if (Flags & parse_normalize_whitespace)
+                end = skip_and_expand_character_refs!(text_pred, text_pure_with_ws_pred, Flags)(text);
+            else
+                end = skip_and_expand_character_refs!(text_pred, text_pure_no_ws_pred, Flags)(text);
+
+            // Trim trailing whitespace if flag is set; leading was already trimmed by whitespace skip after >
+            if (Flags & parse_trim_whitespace)
+            {
+                if (Flags & parse_normalize_whitespace)
+                {
+                    // Whitespace is already condensed to single space characters by skipping function, so just trim 1 char off the end
+                    if (end[-1] == ' ')
+                        end = end[-1 .. $];
+                }
+                else
+                {
+                    // Backup until non-whitespace character is found
+                    while (whitespace_pred.test(end[-1]))
+                        end = end[-1 .. $ - 1];
+                }
+            }
+
+            // If characters are still left between end and value (this test is only necessary if normalization is enabled)
+            // Create new data node
+            if (!(Flags & parse_no_data_nodes))
+            {
+                xml_node data = new xml_node;
+                data.m_value = cast(string)value[0 .. value.length - end.length].dup;
+                node.append_node(data);
+            }
+
+            // Add data to parent node if no data exists yet
+            if (!(Flags & parse_no_element_values))
+                if (node.m_value.length == 0)
+                    node.m_value = cast(string)value[0 ..value.length - end.length];
+
+            // Place zero terminator after value
+            if (!(Flags & parse_no_string_terminators))
+            {
+                ubyte ch = text[0];
+                end[0] ='\0';
+                return ch;      // Return character that ends data; this is required because zero terminator overwritten it
+            }
+			else
+            // Return character that ends data
+            return text[0];
+        }
+
+	xml_node parse_element(int Flags)(ref char[] text)
 	{
 		xml_node element = new xml_node();
-		string prefix = text;
+		char[] prefix = text;
 		//skip element_name_pred
-
 		skip!(element_name_pred)(text);
 		if(text == prefix)
-			writeln("expected element name or prefix", text);
+			throw new parse_error("expected element name or prefix", text);
 		if(text.length >0 && text[0] == ':')
 		{
 			element.m_prefix = prefix[0 .. prefix.length - text.length].dup;
 			text = text[1 .. $ ];
-			string name = text;
+			char[] name = text;
 			//skip node_name_pred
 			skip!(node_name_pred)(text);
 			if(text == name)
-				writeln("expected element local name", text);
+				throw new parse_error("expected element local name", text);
 			element.m_name = name[0 .. name.length - text.length].dup;
 		}
 		else{
@@ -566,47 +719,45 @@ class xml_document :  xml_node
 		//skip whitespace_pred
 		skip!(whitespace_pred)(text);
 		parse_node_attributes!(Flags)(text , element);
-
 		if(text.length > 0 && text[0] == '>')
 		{
 			text = text[1 .. $];
-			string contents = text;
-			string contents_end = null;
+			char[] contents = text;
+			char[] contents_end = null;
 			if(!(Flags & parse_open_only))
+			{	
 				contents_end = parse_node_contents!(Flags)(text , element);
-			
+			}
 			if(contents_end.length != contents.length )
 			{
-				element.m_contents = text[0 .. contents.length - contents_end.length].dup;
+				element.m_contents = cast(string)contents[0 .. contents.length - contents_end.length].dup;
 			}
 		}
 		else if(text.length > 0 && text[0] == '/')
 		{
 			text = text[1 .. $ ];
 			if(text[0] != '>')
-				writeln("expected >", text);
+				throw new parse_error("expected >", text);
 			
 			text = text[1 .. $ ];
 
 			if(Flags & parse_open_only)
-				writeln("open_only, but closed", text);
+				throw new parse_error("open_only, but closed", text);
 		}
 		else 
-			writeln("expected >", text);
-
+			throw new parse_error("expected >", text);
 		// Place zero terminator after name 
 		// no need.
-
 		return element;
 	}
 
-	string parse_node_contents(int Flags)(ref string text , xml_node node)
+	char[] parse_node_contents(int Flags)(ref char[] text , xml_node node)
 	{
-		string retval;
+		char[] retval;
 		
 		while(1)
 		{
-			string contents_start = text;
+			char[] contents_start = text;
 			skip!(whitespace_pred)(text);
 			char next_char = text[0];
 
@@ -621,10 +772,10 @@ after_data_node:
 					text = text[2 .. $ ];
 					if(Flags & parse_validate_closing_tags)
 					{
-						string closing_name = text;
+						string closing_name = cast(string)text.dup;
 						skip!(node_name_pred)(text);
 						if(closing_name == node.m_name)
-							writeln("invalid closing tag name", text);
+							throw new parse_error("invalid closing tag name", text);
 					}
 					else
 					{
@@ -633,10 +784,10 @@ after_data_node:
 
 					skip!(whitespace_pred)(text);
 					if(text[0] != '>')
-						writeln("expected >", text);
+						throw new parse_error("expected >", text);
 					text = text[1 .. $];
 					if(Flags & parse_open_only)
-						writeln("Unclosed element actually closed.", text);
+						throw new parse_error("Unclosed element actually closed.", text);
 					
 					return retval;
 				}
@@ -648,55 +799,64 @@ after_data_node:
 				}
 				break;
 			default:
-				break;
+			 	next_char = parse_and_append_data!(Flags)(node, text, contents_start);
+                goto after_data_node;   // Bypass regular processing after data nodes
+				
 				
 			}
 		}
+		return null;
 	}
 
-	void parse_node_attributes(int Flags)(ref string text , xml_node node)
+	void parse_node_attributes(int Flags)(ref char[] text , xml_node node)
 	{
 		int index = 0;
 		
 		while(text.length > 0 && attribute_name_pred.test(text[0]))
 		{
-			string name = text;
+			char[] name = text;
 			text = text[1 .. $ ];
 			skip!(attribute_name_pred)(text);
 			if(text == name)
-				writeln("expected attribute name", name);
+				throw new parse_error("expected attribute name", name);
 
 			xml_attribute attribute = new xml_attribute();
-			attribute.m_name = name[0 .. name.length - text.length];
+			attribute.m_name = cast(string)name[0 .. name.length - text.length].dup;
+			
 			node.append_attribute(attribute);
 
 			skip!(whitespace_pred)(text);
 			
-			if(text[0] != '=')
-				writeln("expected =", text);
+			if(text.length ==0 || text[0] != '=')
+				throw new parse_error("expected =", text);
 			
 			text = text[1 .. $ ];
 
 			skip!(whitespace_pred)(text);
 			
 			char quote = text[0];
-			if(quote != '\'' && quote != '\"')
-				writeln("expected ' or \"", text);
+			if(quote != '\'' && quote != '"')
+				throw new parse_error("expected ' or \"", text);
 			
 			
 			text = text[1 .. $ ];
-			string value = text ;
-			string end;
+			char[] value = text ;
+			char[] end;
 			const int AttFlags = Flags & ~parse_normalize_whitespace;
-			/*if(quote == "\'")
-				end = skip_and_expand_character_refs  spring
-			else
-				end = skip_and_expand_character_refs*/
 			
-			attribute.m_value = value[0 .. value.length - end.length];
+
+
+			if(quote == '\'')
+				end = skip_and_expand_character_refs!(attribute_value_pred!'\'' , attribute_value_pure_pred!('\'') , AttFlags)(text);
+			else
+				end = skip_and_expand_character_refs!(attribute_value_pred!('"') , attribute_value_pure_pred!('"') , AttFlags)(text);
+			
+
+			attribute.m_value = cast(string)value[0 .. value.length - end.length].dup;
+			
 
 			if(text.length > 0 && text[0] != quote)
-				writeln("expected ' or \"", text);
+				throw new parse_error("expected ' or \"", text);
 			
 			text = text[1 .. $ ];
 
@@ -708,10 +868,10 @@ after_data_node:
 
 
 	
-	static void skip(T )(ref string text)
+	static void skip(T )(ref char[] text)
 	{
 		
-		string tmp = text;
+		char[] tmp = text;
 		while(tmp.length > 0 && T.test(tmp[0]))
 		{
 			tmp = tmp[1 .. $];	
@@ -719,7 +879,7 @@ after_data_node:
 		text = tmp;
 	}
 
-	void parse_bom(ref string text)
+	void parse_bom(ref char[] text)
 	{
 		if(text[0] == 0xEF 
 		&& text[1] == 0xBB 
@@ -730,7 +890,7 @@ after_data_node:
 	}
 
  
-        xml_node parse_xml_declaration(int Flags)(ref string text)
+        xml_node parse_xml_declaration(int Flags)(ref char[] text)
         {
             // If parsing of declaration is disabled
             if (!(Flags & parse_declaration_node))
@@ -739,7 +899,7 @@ after_data_node:
                 while (text[0] != '?' || text[1] != '>')
                 {
                     if (!text[0]) 
-					writeln("unexpected end of data", text);
+					throw new parse_error("unexpected end of data", text);
                     text = text[1 .. $ ];
                 }
                 text = text[2 .. $ ];    // Skip '?>'
@@ -761,7 +921,7 @@ after_data_node:
 
 				// Skip ?>
 				if (text[0] != '?' || text[1] != '>') 
-					writeln("expected ?>", text);
+					throw new parse_error("expected ?>", text);
 				text = text[2 .. $ ];
 
 				return declaration;
@@ -769,7 +929,7 @@ after_data_node:
         }
 
 		
-        xml_node parse_pi(int Flags)(ref string text)
+        xml_node parse_pi(int Flags)(ref char[] text)
         {
             // If creation of PI nodes is enabled
             if (Flags & parse_pi_nodes)
@@ -779,28 +939,28 @@ after_data_node:
 				xml_node.m_type = node_type.node_pi;
 
                 // Extract PI target name
-                string name = text;
+                char[] name = text;
                 skip!node_name_pred(text);
                 if (text == name) 
-					writeln("expected PI target", text);
-                pi.m_name = name[0 .. name.length - text.length];
+					throw new parse_error("expected PI target", text);
+                pi.m_name = cast(string)name[0 .. name.length - text.length].dup;
 
                 // Skip whitespace between pi target and pi
                 skip!whitespace_pred(text);
 
                 // Remember start of pi
-                string value = text;
+                char[] value = text;
 
                 // Skip to '?>'
                 while (text[0] != '?' || text[1] != '>')
                 {
                     if (text == null)
-                        writeln("unexpected end of data", text);
+                        throw new parse_error("unexpected end of data", text);
                     text = text[1 .. $ ];
                 }
 
                 // Set pi value (verbatim, no entity expansion or whitespace normalization)
-                pi.m_value = value[ 0 .. value.length - text.length ];
+                pi.m_value = cast(string)value[ 0 .. value.length - text.length ].dup;
 
                 // Place zero terminator after name and value
 				// no need
@@ -814,7 +974,7 @@ after_data_node:
                 while (text[0] != '?' || text[1] != '>')
                 {
                     if (text[0] == '\0')
-                        writeln("unexpected end of data", text);
+                        throw new parse_error("unexpected end of data", text);
                     text = text[1 .. $ ];
                 }
                 text = text[2 .. $ ];    // Skip '?>'
@@ -823,7 +983,7 @@ after_data_node:
         }
 
 
-        xml_node parse_comment(int Flags)(ref string text)
+        xml_node parse_comment(int Flags)(ref char[] text)
         {
             // If parsing of comments is disabled
             if (!(Flags & parse_comment_nodes))
@@ -831,7 +991,7 @@ after_data_node:
                 // Skip until end of comment
                 while (text[0] != '-' || text[1] != '-' || text[2] != '>')
                 {
-                    if (!text[0]) writeln("unexpected end of data", text);
+                    if (!text[0]) throw new parse_error("unexpected end of data", text);
                     text = text[1 .. $];
                 }
                 text = text [3 .. $];     // Skip '-->'
@@ -847,14 +1007,14 @@ after_data_node:
 				// Skip until end of comment
 				while (text[0] != '-' || text[1] != '-' || text[2] != '>')
 				{
-					if (!text[0]) writeln("unexpected end of data", text);
+					if (!text[0]) throw new parse_error("unexpected end of data", text);
 					text= text[1 .. $];
 				}
 
 				// Create comment node
 				xml_node comment = new xml_node;
 				comment.m_type = node_type.node_comment;
-				comment.m_value = value[0 .. value.length - text.length];
+				comment.m_value = cast(string)value[0 .. value.length - text.length].dup;
 
 				// Place zero terminator after comment value
 				// no need
@@ -866,10 +1026,10 @@ after_data_node:
 
         // Parse DOCTYPE
         
-        xml_node parse_doctype(int Flags)(ref string text)
+        xml_node parse_doctype(int Flags)(ref char[] text)
         {
             // Remember value start
-            string value = text;
+            char[] value = text;
 
             // Skip to >
             while (text[0] != '>')
@@ -890,7 +1050,7 @@ after_data_node:
                         {
                             case '[': ++depth; break;
                             case ']': --depth; break;
-                            default : writeln("unexpected end of data", text);
+                            default : throw new parse_error("unexpected end of data", text);
                         }
                         text = text[1 .. $];
                     }
@@ -899,10 +1059,9 @@ after_data_node:
 
                 // Error on end of text
                 case '\0':
-                    writeln("unexpected end of data", text);
+                    throw new parse_error("unexpected end of data", text);
 
                 // Other character, skip it
-				break;
                 default:
                     text = text[1 .. $ ];
 
@@ -915,7 +1074,7 @@ after_data_node:
                 // Create a new doctype node
                 xml_node doctype = new xml_node;
 				doctype.m_type = node_type.node_doctype;
-                doctype.m_value = value[ 0 .. value.length - text.length];
+                doctype.m_value = cast(string)value[ 0 .. value.length - text.length].dup;
 
                 // Place zero terminator after value
                 // no need
@@ -930,7 +1089,6 @@ after_data_node:
             }
 
         }
-	
 
 }
 
